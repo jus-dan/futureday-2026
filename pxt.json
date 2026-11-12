@@ -6,7 +6,8 @@
         "core": "*",
         "radio": "*",
         "microphone": "*",
-        "Grove": "github:seeed-studio/pxt-grove#v0.7.5"
+        "Grove": "github:seeed-studio/pxt-grove#v0.7.5",
+        "microbit-pxt-flashstorage": "github:bsiever/microbit-pxt-flashstorage#v0.1.4"
     },
     "files": [
         "main.blocks",
