@@ -7,23 +7,23 @@ let strip: neopixel.Strip = null
 //
 // micro:bit V2
 //
-// P16: 10 NeoPixel LEDs
-// P0: Potentiometer
-// P15: Metalltaster links
-// P1: Metalltaster rechts
+// P16 = 10 NeoPixel LEDs
+// P0  = Potentiometer
+// P15 = Metalltaster links
+// P1  = Metalltaster rechts
 //
-// MODUS A: Zufallsfarben
-// MODUS B: Einschlaflicht
-// MODUS C: Lichtshow
-// MODUS D: Reaktionsspiel
+// A = Zufallsfarben
+// B = Einschlaflicht
+// C = Lichtshow
+// D = Reaktionsspiel
 //
-// micro:bit A = Naechster Modus
-// micro:bit B = Vorheriger Modus
-// micro:bit A+B = Licht ein/aus
+// micro:bit Taste A = Naechster Modus
+// micro:bit Taste B = Vorheriger Modus
+// A+B = Licht ein/aus
+//
+// ========================================
 
-// ========================================
 // GRUNDEINSTELLUNGEN
-// ========================================
 
 let modus = 0
 let startmodus = 0
@@ -35,10 +35,12 @@ let lichtAus = false
 let schlafAbgelaufen = false
 
 // Speicherung
+
 let speichernOffen = false
 let speichernAb = 0
 
 // Animationen
+
 let letzteAnimation = 0
 let animationNeu = true
 
@@ -52,7 +54,87 @@ let effektFarben = [
 ]
 
 // ========================================
-// EINSCHLAFTIMER
+// DISPLAY-HELLIGKEIT
+// ========================================
+//
+// 0   = Aus
+// 20  = Stark gedimmt
+// 180 = Normal hell
+//
+// A/C: 15 Sekunden dimmen,
+//      60 Sekunden ausschalten
+//
+// B:   15 Sekunden dimmen,
+//      Countdown bleibt sichtbar
+//
+// D:   Beim Spiel hell,
+//      60 Sekunden nach Ende aus
+
+let displayAktivSeit = 0
+let displayStufe = 0
+
+function displayAufwecken() {
+    displayAktivSeit = input.runningTime()
+    displayStufe = 0
+    led.setBrightness(180)
+}
+
+function displayAktualisieren(jetzt: number) {
+    if (lichtAus) {
+        return
+    }
+
+    let vergangen = jetzt - displayAktivSeit
+
+    // D: Waehrend des Spiels immer hell
+    if (modus == 3 && spielStatus != 4) {
+        if (displayStufe != 0) {
+            led.setBrightness(180)
+            displayStufe = 0
+        }
+        return
+    }
+
+    // B: Countdown bleibt gedimmt sichtbar
+    if (modus == 1) {
+        if (vergangen >= 15000) {
+            if (displayStufe != 1) {
+                led.setBrightness(20)
+                displayStufe = 1
+            }
+        } else {
+            if (displayStufe != 0) {
+                led.setBrightness(180)
+                displayStufe = 0
+            }
+        }
+        return
+    }
+
+    // A und C sowie D nach Spielende
+    if (vergangen >= 60000) {
+        if (displayStufe != 2) {
+            basic.clearScreen()
+            led.setBrightness(0)
+            displayStufe = 2
+        }
+
+    } else if (vergangen >= 15000) {
+        if (displayStufe != 1) {
+            led.setBrightness(20)
+            displayStufe = 1
+        }
+
+    } else {
+        if (displayStufe != 0) {
+            led.setBrightness(180)
+            displayStufe = 0
+        }
+    }
+}
+
+// ========================================
+// EIN SCHLAFTIMER
 // ========================================
 
 let timerZeiten = [5, 10, 15, 25]
@@ -70,11 +152,11 @@ let matrixAktiv = false
 // REAKTIONSSPIEL
 // ========================================
 //
-// Status 0 = Start-Countdown
-// Status 1 = Warten auf Farbe
-// Status 2 = Reagieren
-// Status 3 = Rueckmeldung
-// Status 4 = Spielende
+// 0 = Countdown
+// 1 = Warten
+// 2 = Reagieren
+// 3 = Rueckmeldung
+// 4 = Spielende
 
 let spielStatus = 0
 let runde = 0
@@ -86,11 +168,11 @@ let signalEnde = 0
 let feedbackEnde = 0
 let antwortRichtig = false
 
-// NEU: Start-Countdown 5 bis 0
 let spielCountdownStart = 0
 let spielCountdownZahl = -1
 
 // Tasterentprellung
+
 let letzteLinks = -1000
 let letzteRechts = -1000
 
@@ -138,9 +220,12 @@ function neueZufallsfarbe() {
 
 // ========================================
 // MODUS B: MINUTENANZEIGE
-// 1 LED = 1 MINUTE
-// Die laufende Minute blinkt
 // ========================================
+//
+// Eine LED = Eine Minute
+//
+// Die laufende Minute blinkt
+// im Abstand von 400 Millisekunden
 
 function minutenAnzeigen(minuten: number, aktiv: boolean) {
     minuten = Math.constrain(minuten, 0, 25)
@@ -148,7 +233,8 @@ function minutenAnzeigen(minuten: number, aktiv: boolean) {
     let blink = true
 
     if (aktiv) {
-        blink = Math.idiv(input.runningTime(), 400) % 2 == 0
+        blink =
+            Math.idiv(input.runningTime(), 400) % 2 == 0
     }
 
     if (matrixMinuten == minuten &&
@@ -179,9 +265,13 @@ function minutenAnzeigen(minuten: number, aktiv: boolean) {
     matrixAktiv = aktiv
 }
 
-// Uhrsymbol beim Timerstart
+// ========================================
+// UHR BEIM TIMERSTART
+// ========================================
 
 function uhrAnzeigen() {
+    displayAufwecken()
+
     uhrBis = input.runningTime() + 900
     matrixMinuten = -1
 
@@ -201,59 +291,56 @@ function uhrAnzeigen() {
 function nachSchlafAufwecken() {
     schlafAbgelaufen = false
     lichtAus = false
+
     timerLaeuft = false
     uhrBis = 0
 
-    // Immer zurueck zu Modus A
+    // Immer in Modus A zurueck
     modus = 0
     startmodus = 0
 
-    // Standard wieder 5 Minuten
+    // Timer wieder auf 5 Minuten
     timerWahl = 0
 
     animationNeu = true
     matrixMinuten = -1
 
-    // Gespeicherte Farbe bleibt erhalten
+    // Letzte Farbe bleibt erhalten
+    displayAufwecken()
     basic.showString("A")
 
     speichernAnfordern()
 }
 
 // ========================================
-// MODUS D: SPIEL-COUNTDOWN
+// REAKTIONSSPIEL VORBEREITEN
 // ========================================
-
-// Wird beim Eintritt in D ausgefuehrt
-// und auch bei einem neuen Spiel.
 
 function spielVorbereiten() {
     runde = 0
     punkte = 0
 
-    // Countdown aktivieren
+    // Start-Countdown 5 bis 0
     spielStatus = 0
 
     spielCountdownStart = input.runningTime()
     spielCountdownZahl = -1
 
     animationNeu = true
+
+    displayAufwecken()
     basic.clearScreen()
 }
 
 // ========================================
-// MODUS D: SPIEL STARTEN
+// REAKTIONSSPIEL STARTEN
 // ========================================
-
-// Wird erst NACH dem Countdown
-// aufgerufen.
 
 function spielStarten() {
     runde = 0
     punkte = 0
     spielStatus = 1
 
-    // Zufallspause vor erster Farbe
     naechstesSignal =
         input.runningTime() + randint(1000, 2500)
 
@@ -261,19 +348,17 @@ function spielStarten() {
 }
 
 // ========================================
-// MODUS D: SPIELANTWORT
+// REAKTIONSSPIEL ANTWORT
 // ========================================
 
 function spielAntwort(links: boolean) {
-
-    // Nach Spielende neuer Countdown
+    // Nach Spielende: Neuer Countdown
     if (spielStatus == 4) {
         spielVorbereiten()
         return
     }
 
-    // Waehrend Countdown oder Wartezeit
-    // keine Eingabe auswerten
+    // Waehrend des Countdowns keine Eingabe
     if (spielStatus != 2) {
         return
     }
@@ -285,14 +370,14 @@ function spielAntwort(links: boolean) {
         punkte += 1
         basic.showIcon(IconNames.Yes)
 
-        // Positive Toene
+        // Richtig: Zwei hohe Toene
         music.playTone(988, 90)
         music.playTone(1319, 90)
 
     } else {
         basic.showIcon(IconNames.No)
 
-        // Fehlerton
+        // Falsch: Tiefer Ton
         music.playTone(220, 180)
     }
 
@@ -304,6 +389,8 @@ function spielAntwort(links: boolean) {
 // ========================================
 
 function modusAnzeigen() {
+    displayAufwecken()
+
     if (modus == 0) {
         basic.showString("A")
 
@@ -311,7 +398,10 @@ function modusAnzeigen() {
         basic.showString("B")
 
         matrixMinuten = -1
-        minutenAnzeigen(5, false)
+        minutenAnzeigen(
+            timerZeiten[timerWahl],
+            false
+        )
 
     } else if (modus == 2) {
         basic.showString("C")
@@ -336,12 +426,12 @@ function modusWechseln(neu: number) {
     letzteAnimation = 0
     matrixMinuten = -1
 
-    // Beim Eintritt in B immer 5 Minuten
+    // B startet immer mit 5 Minuten
     if (modus == 1) {
         timerWahl = 0
     }
 
-    // Nur A und C als Startmodus speichern
+    // A und C als Startmodus speichern
     if (modus == 0 || modus == 2) {
         startmodus = modus
         speichernAnfordern()
@@ -349,8 +439,8 @@ function modusWechseln(neu: number) {
 
     modusAnzeigen()
 
+    // Bei D zuerst Countdown
     if (modus == 3) {
-        // NEU: Erst Countdown statt Spiel
         spielVorbereiten()
     }
 }
@@ -368,6 +458,7 @@ function tasteLinks() {
 
     letzteLinks = jetzt
 
+    // Einschlaflicht beenden / aufwecken
     if (schlafAbgelaufen) {
         nachSchlafAufwecken()
         return
@@ -377,12 +468,15 @@ function tasteLinks() {
         return
     }
 
+    displayAufwecken()
+
     if (modus == 0) {
         // A: Neue Zufallsfarbe
         neueZufallsfarbe()
+        basic.showString("A")
 
     } else if (modus == 1) {
-        // B: Timerdauer waehlen
+        // B: Zeit waehlen
         timerLaeuft = false
         uhrBis = 0
 
@@ -395,7 +489,7 @@ function tasteLinks() {
         )
 
     } else if (modus == 2) {
-        // C: Lichteffekt wechseln
+        // C: Naechster Effekt
         effekt = (effekt + 1) % 4
         animationNeu = true
 
@@ -430,12 +524,15 @@ function tasteRechts() {
         return
     }
 
+    displayAufwecken()
+
     if (modus == 0) {
         // A: Neue Zufallsfarbe
         neueZufallsfarbe()
+        basic.showString("A")
 
     } else if (modus == 1) {
-        // B: Timer starten oder stoppen
+        // B: Countdown starten / stoppen
         if (timerLaeuft) {
             timerLaeuft = false
             uhrBis = 0
@@ -449,9 +546,10 @@ function tasteRechts() {
         } else {
             timerLaeuft = true
 
-            timerEnde = jetzt +
-                timerZeiten[timerWahl] * 60000
+            timerEnde =
+                jetzt + timerZeiten[timerWahl] * 60000
 
+            // Uhr als Startbestaetigung
             uhrAnzeigen()
         }
 
@@ -504,13 +602,17 @@ input.onButtonPressed(Button.AB, function () {
 
     if (lichtAus) {
         timerLaeuft = false
+
         strip.clear()
         strip.show()
+
         basic.clearScreen()
+        led.setBrightness(0)
 
     } else {
         animationNeu = true
         matrixMinuten = -1
+
         modusAnzeigen()
 
         if (modus == 3) {
@@ -536,10 +638,17 @@ pins.onPulsed(DigitalPin.P1, PulseValue.High, function () {
 // GESPEICHERTE EINSTELLUNGEN LADEN
 // ========================================
 
-let gespeicherteFarbe = flashstorage.get("lichtfarbe")
-let gespeicherterModus = flashstorage.get("lichtmodus")
-let gespeicherterEffekt = flashstorage.get("lichteffekt")
-let gespeichertesTempo = flashstorage.get("lichttempo")
+let gespeicherteFarbe =
+    flashstorage.get("lichtfarbe")
+
+let gespeicherterModus =
+    flashstorage.get("lichtmodus")
+
+let gespeicherterEffekt =
+    flashstorage.get("lichteffekt")
+
+let gespeichertesTempo =
+    flashstorage.get("lichttempo")
 
 if (gespeicherteFarbe != "") {
     lichtfarbe = parseInt(gespeicherteFarbe)
@@ -581,17 +690,19 @@ strip = neopixel.create(
     NeoPixelMode.RGB
 )
 
-// Eingebauten Lautsprecher aktivieren
+// Lautsprecher fuer Spiel
 music.setBuiltInSpeakerEnabled(true)
 music.setVolume(75)
 
-// Audio nicht auf P0 ausgeben
+// P0 fuer Potentiometer freihalten
 pins.setAudioPinEnabled(false)
 
-// Startlicht
+// Licht einschalten
 strip.setBrightness(100)
 strip.showColor(lichtfarbe)
 
+// Display starten
+displayAufwecken()
 modusAnzeigen()
 
 // ========================================
@@ -601,27 +712,27 @@ modusAnzeigen()
 basic.forever(function () {
     let jetzt = input.runningTime()
 
-    // Einstellungen speichern
+    // Speichern nach 3 Sekunden
     if (speichernOffen && jetzt >= speichernAb) {
         speichern()
     }
 
-    // Helligkeitsregler
+    // Displayhelligkeit automatisch regeln
+    displayAktualisieren(jetzt)
+
+    // Helligkeit vom Potentiometer
     let helligkeit = 5 + Math.idiv(
         pins.analogReadPin(AnalogPin.P0) * 200,
         1023
     )
 
     // ====================================
-    // MODUS D: SPIELLOGIK
+    // MODUS D: REAKTIONSSPIEL
     // ====================================
 
     if (!lichtAus && modus == 3) {
 
-        // --------------------------------
-        // NEU: COUNTDOWN 5 BIS 0
-        // --------------------------------
-
+        // Countdown 5 bis 0
         if (spielStatus == 0) {
             let vergangen =
                 jetzt - spielCountdownStart
@@ -629,7 +740,6 @@ basic.forever(function () {
             let zahl = 5 -
                 Math.idiv(vergangen, 1000)
 
-            // Nur bei neuer Zahl anzeigen
             if (zahl >= 0 &&
                 zahl != spielCountdownZahl) {
 
@@ -637,16 +747,12 @@ basic.forever(function () {
                 basic.showNumber(zahl)
             }
 
-            // Nach Anzeige der 0 starten
             if (vergangen >= 5500) {
                 spielStarten()
             }
         }
 
-        // --------------------------------
-        // WARTEN AUF ZUFALLSFARBE
-        // --------------------------------
-
+        // Zufallsfarbe ausloesen
         if (spielStatus == 1 &&
             jetzt >= naechstesSignal) {
 
@@ -655,17 +761,13 @@ basic.forever(function () {
 
             basic.clearScreen()
 
-            // Kurzer Signalton
             music.playTone(660, 75)
 
             signalEnde =
                 input.runningTime() + 2200
         }
 
-        // --------------------------------
-        // ZEIT ABGELAUFEN
-        // --------------------------------
-
+        // Reaktionszeit abgelaufen
         if (spielStatus == 2 &&
             jetzt >= signalEnde) {
 
@@ -679,10 +781,7 @@ basic.forever(function () {
                 input.runningTime() + 650
         }
 
-        // --------------------------------
-        // NAECHSTE RUNDE / SPIELENDE
-        // --------------------------------
-
+        // Naechste Runde / Spielende
         if (spielStatus == 3 &&
             jetzt >= feedbackEnde) {
 
@@ -692,6 +791,8 @@ basic.forever(function () {
                 spielStatus = 4
                 animationNeu = true
 
+                // Display bleibt noch 60 s
+                displayAufwecken()
                 basic.showNumber(punkte)
 
                 // Abschlussmelodie
@@ -737,6 +838,7 @@ basic.forever(function () {
         // B: EINSCHLAFLICHT
         // =================================
 
+        // Gleiche Farbe wie Modus A
         let nachtHelligkeit = helligkeit
 
         if (timerLaeuft) {
@@ -745,29 +847,31 @@ basic.forever(function () {
 
             if (restzeit <= 0) {
 
-                // Einschlaftimer beendet
+                // Timer abgelaufen
                 timerLaeuft = false
                 lichtAus = true
                 schlafAbgelaufen = true
 
                 strip.clear()
                 strip.show()
+
                 basic.clearScreen()
+                led.setBrightness(0)
 
             } else {
 
-                // 1 LED pro Restminute
+                // 1 LED = 1 Minute
                 let minuten = Math.idiv(
                     restzeit + 59999,
                     60000
                 )
 
-                // Uhr zuerst, danach LEDs
+                // Uhr zuerst, dann Countdown
                 if (input.runningTime() >= uhrBis) {
                     minutenAnzeigen(minuten, true)
                 }
 
-                // Letzte Minute dimmen
+                // Letzte Minute sanft dimmen
                 if (restzeit <= 60000) {
                     nachtHelligkeit = Math.idiv(
                         helligkeit * restzeit,
@@ -777,7 +881,8 @@ basic.forever(function () {
             }
 
         } else {
-            // Eingestellte Minuten
+
+            // Eingestellte Dauer anzeigen
             minutenAnzeigen(
                 timerZeiten[timerWahl],
                 false
@@ -885,8 +990,8 @@ basic.forever(function () {
 
         if (spielStatus == 0) {
 
-            // COUNTDOWN: ruhiges Violett
-            // Noch keine Toene!
+            // COUNTDOWN
+            // Leise, schwaches Violett
             strip.setBrightness(20)
             strip.showColor(
                 neopixel.rgb(60, 0, 120)
